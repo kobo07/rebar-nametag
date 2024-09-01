@@ -10,34 +10,37 @@ const Rebar = useRebarClient();
 const webview = Rebar.webview.useWebview();
 const messenger = Rebar.messenger.useMessenger();
 
+// Store nametags for each entity
+const nameTags = new Map();
 
+// Create nametag when a game entity is created
+alt.on('gameEntityCreate', (entity) => {
+    if (entity instanceof alt.Player && entity !== alt.Player.local) {
+        const nametag = {
+            id: entity.getStreamSyncedMeta('id') as number,
+            name: entity.getStreamSyncedMeta('name') as string
+        };
+        nameTags.set(entity, nametag);
+    }
+});
 
+// Remove nametag when a game entity is destroyed
+alt.on('gameEntityDestroy', (entity) => {
+    if (nameTags.has(entity)) {
+        nameTags.delete(entity);
+    }
+});
+
+// Draw nametags
 alt.everyTick(() => {
-    drawText2D(`X: ${(alt.Player.local.pos.x).toFixed(2)}   Y: ${(alt.Player.local.pos.y).toFixed(2)}   Z: ${(alt.Player.local.pos.z).toFixed(2)}`, { x: 0.5, y: 0 }, 0.5, new alt.RGBA(255, 255, 255));
-})
-
-
-
-
-alt.everyTick(() => {
-    alt.Player.all.forEach((player) => {
-        if(player === alt.Player.local) {
+    nameTags.forEach((nametag, player) => {
+        if (!player || player.vehicle) {
             return;
         }
 
-        if (!player) {
-            return;
-        }
-        const id = player.getStreamSyncedMeta('id') as number;
-        const name = player.getStreamSyncedMeta('name') as string;
         const distance = alt.Player.local.pos.distanceTo(player.pos);
 
         if (distance > 15) {
-            return;
-        }
-        const isinvehicle: boolean = player.vehicle ? true : false;
-
-        if (isinvehicle) {
             return;
         }
 
@@ -47,7 +50,7 @@ alt.everyTick(() => {
         let scale = 1 - (0.8 * distance) / 50;
         let size = scale * 0.42;
 
-        const entity = player.vehicle ? player.vehicle.scriptID : player.scriptID;
+        const entity = player.scriptID;
         const vector = native.getEntityVelocity(entity);
         const frameTime = native.getFrameTime();
 
@@ -55,28 +58,17 @@ alt.everyTick(() => {
         const y = pos.y + vector.y * frameTime;
         const z = pos.z + vector.z * frameTime;
 
-        native.drawRect(0, 0, 0, 0, 0, 0, 0, 0, false);
-        drawText3D(`${id} -- ${name}`, { x: x, y: y, z: z }, size, new alt.RGBA(255, 255, 255),);
-    })
+        drawText3D(`${nametag.id} -- ${nametag.name}`, { x, y, z }, size, new alt.RGBA(255, 255, 255));
+    });
 });
 
 
-
-
-
-/**
- * Draw stable text in a 3D position with an every tick.
- * @param  {string} text
- * @param  {alt.Vector3} pos
- * @param  {number} scale
- * @param  {alt.RGBA} color
- */
-export function drawText3D(text: string, pos: alt.IVector3, scale: number, color: alt.RGBA, offset = alt.Vector2.zero) {
+function drawText3D(text: string, pos: alt.IVector3, scale: number, color: alt.RGBA, offset = alt.Vector2.zero) {
     if (scale > 2) {
         scale = 2;
     }
 
-    native.setDrawOrigin(pos.x, pos.y, pos.z, false); // Used to stabalize text, sprites, etc. in a 3D Space.
+    native.setDrawOrigin(pos.x, pos.y, pos.z, false);
     native.beginTextCommandDisplayText('STRING');
     native.addTextComponentSubstringPlayerName(text);
     native.setTextFont(1);
@@ -89,3 +81,13 @@ export function drawText3D(text: string, pos: alt.IVector3, scale: number, color
     native.endTextCommandDisplayText(offset.x, offset.y, 0);
     native.clearDrawOrigin();
 }
+
+
+alt.everyTick(() => {
+    drawText2D(
+        `X: ${alt.Player.local.pos.x.toFixed(2)}   Y: ${alt.Player.local.pos.y.toFixed(2)}   Z: ${alt.Player.local.pos.z.toFixed(2)}`,
+        { x: 0.5, y: 0 },
+        0.5,
+        new alt.RGBA(255, 255, 255)
+    );
+});
